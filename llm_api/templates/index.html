@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>COT-Manus</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            display: flex;
+            min-height: 100vh;
+            gap: 20px;
+            padding: 20px;
+        }
+
+        .column {
+            flex: 1;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            padding: 20px;
+        }
+
+        h2 {
+            margin-top: 0;
+            margin-bottom: 20px;
+            color: #1f2937;
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+
+        .output-section {
+            margin-top: 20px;
+            padding: 0;
+            background: white;
+        }
+
+        .output-section h2 {
+            margin: 0 0 15px 0;
+            color: #1f2937;
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .output-wrapper {
+            overflow: auto;
+            height: 100px;
+            min-height: 100px;
+            max-height: 1000px;
+            border: 1px solid #e5e7eb;
+            border-radius: 4px;
+            padding: 15px;
+            resize: vertical;
+            background-color: #f8f9fa;
+        }
+
+        #raw-output {
+            white-space: pre-wrap;
+            word-break: break-word;
+            margin: 0;
+            font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.5;
+            color: #1f2937;
+        }
+
+        .zoom-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .zoom-button {
+            padding: 5px 10px;
+            background-color: #f3f4f6;
+            border: 1px solid #e5e7eb;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            color: #374151;
+            width: auto;
+        }
+
+        .zoom-button:hover {
+            background-color: #e5e7eb;
+        }
+
+        .zoom-button:disabled {
+            background-color: #9ca3af;
+            cursor: not-allowed;
+            color: white;
+            border-color: #9ca3af;
+        }
+
+        .zoom-level {
+            font-size: 14px;
+            color: #374151;
+            min-width: 50px;
+            text-align: center;
+        }
+
+        #mermaid-container {
+            transform-origin: top left;
+            transition: transform 0.2s ease;
+            width: 100%;
+            display: block;
+            justify-content: flex-start;
+        }
+
+
+        .visualization-wrapper {
+            overflow: auto;
+            height: 370px;
+            min-height: 100px;
+            max-height: 1000px;
+            border: 1px solid #e5e7eb;
+            border-radius: 4px;
+            padding: 0;
+            resize: vertical;
+            background-color: #f8f9fa;
+        }
+
+        .mermaid {
+            padding: 0;
+            border-radius: 4px;
+        }
+
+        .has-visualization .placeholder-visualization {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="column">
+            <div class="output-section">
+                <h3>Raw Model Output</h3>
+                <div class="output-wrapper">
+                    <pre id="raw-output">{{raw_output}}</pre>
+                </div>
+            </div>
+        </div>
+
+        <div class="column">
+            <div class="output-section">
+                <h2>Visualization Results</h2>
+                <div class="zoom-controls">
+                    <button class="zoom-button" onclick="adjustZoom(-0.1)">-</button>
+                    <div class="zoom-level" id="zoom-level">100%</div>
+                    <button class="zoom-button" onclick="adjustZoom(0.1)">+</button>
+                    <button class="zoom-button" onclick="resetZoom()">Reset</button>
+                    <button class="zoom-button" onclick="downloadDiagram()">Download Flow Chart</button>
+                    <button class="zoom-button" onclick="downloadMermaidCode()">Download Code</button>
+                </div>
+                <div class="visualization-wrapper">
+                    <div id="mermaid-container">
+                        <div id="mermaid-diagram">{{mermaid_code}}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Mermaid
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'default',
+            securityLevel: 'loose',
+            flowchart: {
+                curve: 'basis',
+                padding: 15
+            }
+        });
+
+        // Store current configuration
+        let currentConfig = null;
+
+        // Zoom control variables
+        let currentZoom = 1;
+        const MIN_ZOOM = 0.1;
+        const MAX_ZOOM = 5;
+
+        // Initialize zoom lock flag
+        window.isZoomLocked = false;
+
+        function adjustZoom(delta) {
+            // Do nothing if zooming is locked
+            if (window.isZoomLocked) return;
+
+            const newZoom = Math.min(Math.max(currentZoom + delta, MIN_ZOOM), MAX_ZOOM);
+            if (newZoom !== currentZoom) {
+                currentZoom = newZoom;
+                applyZoom();
+            }
+        }
+
+        function resetZoom() {
+            // Do nothing if zooming is locked
+            if (window.isZoomLocked) return;
+
+            currentZoom = 1;
+            applyZoom();
+        }
+
+        function applyZoom() {
+            const container = document.getElementById('mermaid-container');
+            container.style.transform = `scale(${currentZoom})`;
+
+            // Update zoom level display
+            const percentage = Math.round(currentZoom * 100);
+            document.getElementById('zoom-level').textContent = `${percentage}%`;
+        }
+
+        function lockVisualization() {
+            window.isZoomLocked = true;
+            const zoomButtons = document.querySelectorAll('.zoom-button');
+            zoomButtons.forEach(button => button.disabled = true);
+            document.querySelector('.visualization-wrapper').style.pointerEvents = 'none';
+        }
+
+        function unlockVisualization() {
+            window.isZoomLocked = false;
+            const zoomButtons = document.querySelectorAll('.zoom-button');
+            zoomButtons.forEach(button => button.disabled = false);
+            document.querySelector('.visualization-wrapper').style.pointerEvents = 'auto';
+        }
+
+        async function downloadDiagram() {
+            // Do nothing if zooming is locked
+            if (window.isZoomLocked) return;
+
+            const diagramContainer = document.getElementById('mermaid-diagram');
+            if (!diagramContainer || !diagramContainer.querySelector('svg')) {
+                alert('No diagram available to download');
+                return;
+            }
+
+            try {
+                // Get the SVG element
+                const svg = diagramContainer.querySelector('svg');
+
+                // Create a copy of the SVG to modify
+                const svgCopy = svg.cloneNode(true);
+
+                // Ensure the SVG has proper dimensions
+                const bbox = svg.getBBox();
+                svgCopy.setAttribute('width', bbox.width);
+                svgCopy.setAttribute('height', bbox.height);
+                svgCopy.setAttribute('viewBox', `${bbox.x} ${bbox.y} ${bbox.width} ${bbox.height}`);
+
+                // Convert SVG to string
+                const serializer = new XMLSerializer();
+                const svgString = serializer.serializeToString(svgCopy);
+
+                // Create blob and download link
+                const blob = new Blob([svgString], {type: 'image/svg+xml'});
+                const url = URL.createObjectURL(blob);
+
+                // Create temporary link and trigger download
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = 'reasoning_diagram.svg';
+                document.body.appendChild(link);
+                link.click();
+
+                // Cleanup
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+            } catch (error) {
+                console.error('Error downloading diagram:', error);
+                alert('Failed to download diagram');
+            }
+        }
+
+        // Function to download the Mermaid code
+        async function downloadMermaidCode() {
+            // Do nothing if zooming is locked
+            if (window.isZoomLocked) return;
+
+            try {
+                // First, check if we have stored code from the last visualization
+                let mermaidCode = document.getElementsByClassName('mermaid')[0]?.textContent;
+                let currentRawOutput = "";
+
+                // If no stored code, try to extract it
+                if (!mermaidCode) {
+                    const diagramContainer = document.getElementById('mermaid-diagram');
+                    if (!diagramContainer) {
+                        alert('No diagram available to download code');
+                        return;
+                    }
+
+                    // Try to find the mermaid element with the code
+                    const mermaidElement = diagramContainer.querySelector('.mermaid');
+
+                    if (mermaidElement) {
+                        // Get the text content which contains the Mermaid code
+                        mermaidCode = mermaidElement.getAttribute('data-processed') === 'true'
+                            ? mermaidElement.dataset.graph
+                            : mermaidElement.textContent;
+                    }
+
+                    // Fallback: If we can't get the code directly, try to extract from raw output
+                    if (!mermaidCode && currentRawOutput) {
+                        mermaidCode = extractMermaidCode(currentRawOutput);
+                    }
+
+                    if (!mermaidCode) {
+                        // Another fallback: try to extract from svg data
+                        const svg = diagramContainer.querySelector('svg');
+                        if (svg) {
+                            const svgData = svg.outerHTML;
+                            // Look for mermaid data embedded in the SVG
+                            const match = svgData.match(/data-mermaid="(.*?)"/);
+                            if (match && match[1]) {
+                                mermaidCode = decodeURIComponent(match[1]);
+                            }
+                        }
+                    }
+                }
+
+                if (!mermaidCode) {
+                    // If we still don't have the code, try to generate a basic flowchart from the SVG
+                    const diagramContainer = document.getElementById('mermaid-diagram');
+                    const svg = diagramContainer && diagramContainer.querySelector('svg');
+
+                    if (svg) {
+                        // Try to reconstruct Mermaid code from SVG elements
+                        mermaidCode = "flowchart TD\n";
+                        mermaidCode += "    A[\"This is an auto-generated approximation of the flowchart.\"]\n";
+                        mermaidCode += "    B[\"The original Mermaid code could not be extracted.\"]\n";
+                        mermaidCode += "    A --> B\n";
+                        mermaidCode += "    classDef default fill:#f9f9f9,stroke:#333,stroke-width:2px;";
+                    } else {
+                        alert('Unable to extract or generate Mermaid code');
+                        return;
+                    }
+                }
+
+                // Create blob and download link
+                const blob = new Blob([mermaidCode], {type: 'text/plain'});
+                const url = URL.createObjectURL(blob);
+
+                // Create temporary link and trigger download
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = 'diagram_code.txt';
+                document.body.appendChild(link);
+                link.click();
+
+                // Cleanup
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+            } catch (error) {
+                console.error('Error downloading Mermaid code:', error);
+                alert('Failed to download Mermaid code: ' + error.message);
+            }
+        }
+
+
+    </script>
+</body>
+</html>
