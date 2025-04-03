@@ -134,6 +134,11 @@ For unstable multi-agent version, you also can run:
 ```bash
 python run_flow.py
 ```
+For cot-Visualization version, you also can run:
+
+```bash
+python run_cot.py
+```
 
 ## How to contribute
 
